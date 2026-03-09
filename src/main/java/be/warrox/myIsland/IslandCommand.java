@@ -59,7 +59,7 @@ public class IslandCommand implements CommandExecutor {
         var mvWorld = plugin.getMultiverseCore().getMVWorldManager().getMVWorld(worldName);
 
         if (mvWorld != null) {
-            player.teleport(mvWorld.getBukkitWorld().getSpawnLocation());
+            player.teleport(mvWorld.getCBWorld().getSpawnLocation());
             player.sendMessage("§aGeteleporteerd naar " + targetName + "'s eiland!");
         } else {
             player.sendMessage("§cDit eiland bestaat niet.");
@@ -90,3 +90,4 @@ public class IslandCommand implements CommandExecutor {
         }
     }
 }
+

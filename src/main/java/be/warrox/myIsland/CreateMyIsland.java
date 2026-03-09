@@ -1,12 +1,10 @@
 package be.warrox.myIsland;
 
-import com.onarandombox.multiversecore.api.MVWorldManager;
-import com.onarandombox.multiversecore.api.world.WorldCreationSettings;
+import com.onarandombox.MultiverseCore.api.MVWorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
 import org.bukkit.WorldType;
-import org.bukkit.entity.Player;
 
 public class CreateMyIsland {
     private final MyIsland plugin;
@@ -15,41 +13,43 @@ public class CreateMyIsland {
         this.plugin = plugin;
     }
 
-    public void createIsland(Player player) {
-        String playerName = player.getName();
+    public void createIsland(String playerName) {
         String worldName = "island_" + playerName;
 
         // Haal de WorldManager op via de Multiverse-Core API
         MVWorldManager worldManager = plugin.getMultiverseCore().getMVWorldManager();
 
         // Controleer of de wereld al bestaat in Multiverse
-        if (worldManager.hasWorld(worldName)) {
-            player.sendMessage("§cJe hebt al een eiland!");
+        if (worldManager.isMVWorld(worldName)) {
+            plugin.getLogger().info("Wereld " + worldName + " bestaat al.");
             return;
         }
 
-        // Maak de instellingen voor de nieuwe wereld
-        WorldCreationSettings settings = new WorldCreationSettings(worldName)
-                .env(World.Environment.NORMAL)
-                .type(WorldType.FLAT)
-                .generateStructures(false)
-                .generator("minecraft:air;minecraft:plains"); // Zorgt voor een lege wereld
+        // Wereld aanmaken: Naam, Omgeving, Seed, Type, Structures, Generator
+        // We gebruiken "CleanroomGenerator" of een lege string voor een void world,
+        // maar FLAT met de juiste instellingen werkt ook.
+        boolean success = worldManager.addWorld(
+                worldName,
+                World.Environment.NORMAL,
+                null, // Random seed
+                WorldType.FLAT,
+                false, // Geen dorpen/structures
+                null   // Standaard generator
+        );
 
-        // Maak de wereld asynchroon aan
-        worldManager.createWorld(settings).thenAccept(success -> {
-            if (success) {
-                plugin.getLogger().info("Eiland succesvol aangemaakt voor " + playerName);
-                player.sendMessage("§aEiland wordt voorbereid...");
-                // Wacht even tot de wereld geladen is en bouw dan het platform
-                Bukkit.getScheduler().runTask(plugin, () -> {
-                    generatePlatform(worldManager.getMVWorld(worldName).getBukkitWorld());
-                    player.sendMessage("§aJe eiland is klaar! Gebruik /myi tpisland om ernaartoe te gaan.");
-                });
-            } else {
-                plugin.getLogger().severe("Aanmaken van eiland mislukt voor " + playerName);
-                player.sendMessage("§cEr is iets misgegaan bij het aanmaken van je eiland.");
-            }
-        });
+        if (success) {
+            plugin.getLogger().info("Eiland succesvol aangemaakt voor " + playerName);
+
+            // Wacht even tot de wereld geladen is en bouw dan het 16x16 platform
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                World world = Bukkit.getWorld(worldName);
+                if (world != null) {
+                    generatePlatform(world);
+                }
+            }, 20L); // 1 seconde vertraging
+        } else {
+            plugin.getLogger().severe("Aanmaken van eiland mislukt voor " + playerName);
+        }
     }
 
     private void generatePlatform(World world) {
@@ -63,3 +63,4 @@ public class CreateMyIsland {
         world.setSpawnLocation(8, 65, 8);
     }
 }
+

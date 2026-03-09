@@ -6,7 +6,7 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
-import com.onarandombox.multiversecore.MultiverseCore;
+import org.mvplugins.multiverse.core.MultiverseCore;
 
 
 public final class MyIsland extends JavaPlugin implements Listener {

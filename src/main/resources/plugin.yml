@@ -1,7 +1,7 @@
 name: MyIsland
 version: '1.0'
 main: be.warrox.myIsland.MyIsland
-api-version: '1.21'
+api-version: '1.21.11'
 depend: [Multiverse-Core]
 commands:
   myi:

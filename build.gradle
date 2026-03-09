@@ -12,16 +12,12 @@ repositories {
         name = "papermc-repo"
         url = "https://repo.papermc.io/repository/maven-public/"
     }
-    maven {
-        name = "codemc-repo"
-        url = "https://repo.codemc.io/repository/maven-public/"
-    }
 }
 
 dependencies {
     compileOnly("io.papermc.paper:paper-api:1.21.11-R0.1-SNAPSHOT")
-    // Use the Multiverse-Core API for version 5.x
-    compileOnly("com.onarandombox.multiversecore:multiverse-core:5.0.0-SNAPSHOT")
+    compileOnly(files("run/plugins/multiverse-core-5.5.3-pre.1.jar"))
+
 }
 
 tasks {
