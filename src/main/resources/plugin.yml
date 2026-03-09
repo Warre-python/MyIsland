@@ -1,0 +1,9 @@
+name: MyIsland
+version: '1.0'
+main: be.warrox.myIsland.MyIsland
+api-version: '1.21'
+depend: [Multiverse-Core]
+commands:
+  myi:
+    description: Hoofdcommando voor MyIsland
+    usage: /<command>
