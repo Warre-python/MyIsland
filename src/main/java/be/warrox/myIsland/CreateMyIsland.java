@@ -1,10 +1,17 @@
 package be.warrox.myIsland;
 
-import com.onarandombox.MultiverseCore.api.MVWorldManager;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
+import org.bukkit.WorldBorder;
 import org.bukkit.WorldType;
+import org.bukkit.entity.Player;
+import org.mvplugins.multiverse.core.MultiverseCoreApi;
+import org.mvplugins.multiverse.core.utils.result.Attempt;
+import org.mvplugins.multiverse.core.world.LoadedMultiverseWorld;
+import org.mvplugins.multiverse.core.world.WorldManager;
+import org.mvplugins.multiverse.core.world.options.CreateWorldOptions;
+import org.mvplugins.multiverse.core.world.reasons.CreateFailureReason;
 
 public class CreateMyIsland {
     private final MyIsland plugin;
@@ -13,38 +20,37 @@ public class CreateMyIsland {
         this.plugin = plugin;
     }
 
-    public void createIsland(String playerName) {
-        String worldName = "island_" + playerName;
+    public void createIsland(Player player) {
+        String playerName = player.getName();
+        String worldName = "island_" + player.getName();
 
-        // Haal de WorldManager op via de Multiverse-Core API
-        MVWorldManager worldManager = plugin.getMultiverseCore().getMVWorldManager();
+        MultiverseCoreApi api = MultiverseCoreApi.get();
+        WorldManager worldManager = api.getWorldManager();
 
         // Controleer of de wereld al bestaat in Multiverse
-        if (worldManager.isMVWorld(worldName)) {
-            plugin.getLogger().info("Wereld " + worldName + " bestaat al.");
+        if (worldManager.isWorld(worldName)) {
+            plugin.getLogger().info("Wereld van " + playerName + "bestaat al! ("+ worldName + ")");
+            player.sendMessage("§aWereld van " + playerName + "bestaat al!");
             return;
         }
 
-        // Wereld aanmaken: Naam, Omgeving, Seed, Type, Structures, Generator
-        // We gebruiken "CleanroomGenerator" of een lege string voor een void world,
-        // maar FLAT met de juiste instellingen werkt ook.
-        boolean success = worldManager.addWorld(
-                worldName,
-                World.Environment.NORMAL,
-                null, // Random seed
-                WorldType.FLAT,
-                false, // Geen dorpen/structures
-                null   // Standaard generator
-        );
 
-        if (success) {
+        Attempt<LoadedMultiverseWorld, CreateFailureReason> attempt = worldManager.createWorld(CreateWorldOptions.worldName(worldName)
+                .environment(World.Environment.NORMAL)
+                .seed(null)
+                .worldType(WorldType.FLAT)
+                .generateStructures(false)
+                .generator(null));
+
+
+        if (attempt.isSuccess()) {
             plugin.getLogger().info("Eiland succesvol aangemaakt voor " + playerName);
 
             // Wacht even tot de wereld geladen is en bouw dan het 16x16 platform
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 World world = Bukkit.getWorld(worldName);
                 if (world != null) {
-                    generatePlatform(world);
+                    generateWorldBorder(world);
                 }
             }, 20L); // 1 seconde vertraging
         } else {
@@ -52,15 +58,10 @@ public class CreateMyIsland {
         }
     }
 
-    private void generatePlatform(World world) {
-        // Maak een 16x16 (1 chunk) platform op y=64
-        for (int x = 0; x < 16; x++) {
-            for (int z = 0; z < 16; z++) {
-                world.getBlockAt(x, 64, z).setType(Material.GRASS_BLOCK);
-            }
-        }
-        // Zet de spawn in het midden van het platform
-        world.setSpawnLocation(8, 65, 8);
+    private void generateWorldBorder(World world) {
+        // Set the world border to enclose the 16x16 platform
+        WorldBorder worldBorder = world.getWorldBorder();
+        worldBorder.setCenter(0, 0);
+        worldBorder.setSize(16);
     }
 }
-

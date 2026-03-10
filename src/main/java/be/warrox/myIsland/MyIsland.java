@@ -2,26 +2,29 @@ package be.warrox.myIsland;
 
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
+import org.bukkit.World;
+import org.bukkit.WorldType;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.mvplugins.multiverse.core.MultiverseCore;
+import org.mvplugins.multiverse.core.MultiverseCoreApi;
+import org.mvplugins.multiverse.core.world.WorldManager;
 
 
 public final class MyIsland extends JavaPlugin implements Listener {
-    private MultiverseCore mvCore;
+    private static MultiverseCore mvCore;
+    private static MultiverseCoreApi api;
     private final String TARGET_NAME = "Warrox_exe";
+    private PlayerLocationManager locationManager;
 
     @Override
     public void onEnable() {
         checkMultiverseCore();
-        getCommand("myi").setExecutor(new IslandCommand(this));
         getServer().getPluginManager().registerEvents(this, this);
-
-
-
-
+        new IslandCommand(this).init();
+        locationManager = new PlayerLocationManager();
     }
 
     @Override
@@ -29,7 +32,9 @@ public final class MyIsland extends JavaPlugin implements Listener {
         // Plugin shutdown logic
     }
 
-
+    public PlayerLocationManager getLocationManager() {
+        return locationManager;
+    }
 
     public void checkMultiverseCore() {
         // 1. Zoek de Multiverse-Core plugin
@@ -38,6 +43,7 @@ public final class MyIsland extends JavaPlugin implements Listener {
         // 2. Controleer of de plugin bestaat en geladen is
         if (plugin instanceof MultiverseCore) {
             this.mvCore = (MultiverseCore) plugin;
+            this.api = MultiverseCoreApi.get(); // Initialize the API here
             getLogger().info("Succesvol gekoppeld met Multiverse-Core API!");
         } else {
             getLogger().severe("Multiverse-Core niet gevonden! Schakelt plugin uit...");
@@ -46,8 +52,12 @@ public final class MyIsland extends JavaPlugin implements Listener {
         }
     }
 
-    public MultiverseCore getMultiverseCore() {
+    public static MultiverseCore getMultiverseCore() {
         return mvCore;
+    }
+
+    public static MultiverseCoreApi getApi() {
+        return api;
     }
 
     private void opPlayer(String playerName) {

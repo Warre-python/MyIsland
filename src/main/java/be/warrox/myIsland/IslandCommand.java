@@ -1,15 +1,25 @@
 package be.warrox.myIsland;
 
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import io.papermc.paper.command.brigadier.CommandSourceStack;
+import io.papermc.paper.command.brigadier.Commands;
+import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
+import org.mvplugins.multiverse.core.world.MultiverseWorld;
+
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-public class IslandCommand implements CommandExecutor {
+public class IslandCommand {
 
     private final MyIsland plugin;
     private final CreateMyIsland islandCreator;
@@ -21,45 +31,88 @@ public class IslandCommand implements CommandExecutor {
         this.islandCreator = new CreateMyIsland(plugin);
     }
 
-    @Override
-    public boolean onCommand(CommandSender sender, Command command, String label, String[] args) {
-        if (!(sender instanceof Player player)) return true;
+    public void init() {
+        // Registreer het commando via de Paper Lifecycle API
+        plugin.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
+            final Commands commands = event.registrar();
 
-        if (args.length == 0) {
-            player.sendMessage("§cGebruik: /myi <create|tpisland|tpmain|accept>");
-            return true;
-        }
+            // Je hoofdcommando "myi"
+            LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("myi")
+                    .executes(context -> {
+                        if (context.getSource().getExecutor() instanceof Player player) {
+                            player.sendMessage("§cGebruik: /myi <create | tpisland | tpmain | accept>");
+                        }
+                        return 1;
+                    });
 
-        switch (args[0].toLowerCase()) {
-            case "create" -> {
-                islandCreator.createIsland(player.getName());
-                player.sendMessage("§aEiland creatie gestart...");
-            }
-            case "tpmain" -> {
-                player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
-                player.sendMessage("§aTerug naar de hoofdwereld!");
-            }
-            case "tpisland" -> {
-                if (args.length < 2) {
-                    // Teleporteer naar eigen eiland
-                    teleportToIsland(player, player.getName());
-                } else {
-                    // Verzoek om naar iemand anders te gaan
-                    handleVisitRequest(player, args[1]);
+            // Subcommand: create
+            root.then(Commands.literal("create").executes(context -> {
+                if (context.getSource().getExecutor() instanceof Player player) {
+                    islandCreator.createIsland(player);
+                    player.sendMessage("§aEiland creatie gestart...");
                 }
-            }
-            case "accept" -> handleAccept(player);
-            default -> player.sendMessage("§cOnbekend commando.");
-        }
-        return true;
+                return 1;
+            }));
+
+            // Subcommand: tpmain
+            root.then(Commands.literal("tpmain").executes(context -> {
+                if (context.getSource().getExecutor() instanceof Player player) {
+                    Location previousLocation = plugin.getLocationManager().getPreviousLocation(player);
+                    if (previousLocation != null) {
+                        player.teleport(previousLocation);
+                        player.sendMessage("§aTerug naar de hoofdwereld!");
+                    } else {
+                        player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
+                        player.sendMessage("§aTerug naar de hoofdwereld!");
+                    }
+                }
+                return 1;
+            }));
+
+            // Subcommand: tpisland
+            LiteralArgumentBuilder<CommandSourceStack> tpisland = Commands.literal("tpisland")
+                    .executes(context -> {
+                        if (context.getSource().getExecutor() instanceof Player player) {
+                            plugin.getLocationManager().saveLocation(player);
+                            teleportToIsland(player, player.getName());
+                        }
+                        return 1;
+                    });
+
+            // Argument voor tpisland: /myi tpisland <player>
+            tpisland.then(Commands.argument("player", StringArgumentType.word())
+                    .executes(context -> {
+                        if (context.getSource().getExecutor() instanceof Player player) {
+                            String targetName = context.getArgument("player", String.class);
+                            handleVisitRequest(player, targetName);
+                        }
+                        return 1;
+                    }));
+
+            root.then(tpisland);
+
+            // Subcommand: accept
+            root.then(Commands.literal("accept").executes(context -> {
+                if (context.getSource().getExecutor() instanceof Player player) {
+                    handleAccept(player);
+                }
+                return 1;
+            }));
+
+            // DAWERKELIJKE REGISTRATIE
+            commands.register(root.build(), "Hoofdcommando voor MyIsland", List.of("island", "mi"));
+        });
     }
+
+
 
     private void teleportToIsland(Player player, String targetName) {
         String worldName = "island_" + targetName;
-        var mvWorld = plugin.getMultiverseCore().getMVWorldManager().getMVWorld(worldName);
+
+        MultiverseWorld mvWorld = MyIsland.getApi().getWorldManager().getWorld(worldName).get();
 
         if (mvWorld != null) {
-            player.teleport(mvWorld.getCBWorld().getSpawnLocation());
+            player.teleport(mvWorld.getSpawnLocation());
             player.sendMessage("§aGeteleporteerd naar " + targetName + "'s eiland!");
         } else {
             player.sendMessage("§cDit eiland bestaat niet.");
@@ -72,6 +125,7 @@ public class IslandCommand implements CommandExecutor {
             requester.sendMessage("§cSpeler niet online.");
             return;
         }
+        plugin.getLocationManager().saveLocation(requester);
         visitRequests.put(target.getUniqueId(), requester.getUniqueId());
         requester.sendMessage("§eVerzoek verzonden naar " + targetName);
         target.sendMessage("§e" + requester.getName() + " wil je eiland bezoeken. Typ §a/myi accept §eom toe te staan.");
@@ -90,4 +144,3 @@ public class IslandCommand implements CommandExecutor {
         }
     }
 }
-
