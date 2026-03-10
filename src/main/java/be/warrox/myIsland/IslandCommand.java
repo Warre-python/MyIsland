@@ -49,7 +49,7 @@ public class IslandCommand {
             root.then(Commands.literal("create").executes(context -> {
                 if (context.getSource().getExecutor() instanceof Player player) {
                     islandCreator.createIsland(player);
-                    player.sendMessage("§aEiland creatie gestart...");
+
                 }
                 return 1;
             }));

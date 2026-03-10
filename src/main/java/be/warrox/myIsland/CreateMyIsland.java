@@ -30,8 +30,11 @@ public class CreateMyIsland {
         // Controleer of de wereld al bestaat in Multiverse
         if (worldManager.isWorld(worldName)) {
             plugin.getLogger().info("Wereld van " + playerName + "bestaat al! ("+ worldName + ")");
-            player.sendMessage("§aWereld van " + playerName + "bestaat al!");
+            player.sendMessage("§aJe hebt al een eiland aangemaakt!");
             return;
+        } else {
+            plugin.getLogger().info("Eiland creatie gestart voor " + playerName);
+            player.sendMessage("§aEiland creatie gestart...");
         }
 
 
@@ -44,7 +47,7 @@ public class CreateMyIsland {
 
 
         if (attempt.isSuccess()) {
-            plugin.getLogger().info("Eiland succesvol aangemaakt voor " + playerName);
+
 
             // Wacht even tot de wereld geladen is en bouw dan het 16x16 platform
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
@@ -53,8 +56,11 @@ public class CreateMyIsland {
                     generateWorldBorder(world);
                 }
             }, 20L); // 1 seconde vertraging
+            plugin.getLogger().info("Eiland succesvol aangemaakt voor " + playerName);
+            player.sendMessage("§aEiland succesvol aangemaakt!");
         } else {
             plugin.getLogger().severe("Aanmaken van eiland mislukt voor " + playerName);
+            player.sendMessage("§aAanmaken van eiland mislukt!");
         }
     }
 
