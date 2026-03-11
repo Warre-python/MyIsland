@@ -1,5 +1,6 @@
 package be.warrox.myIsland;
 
+import net.kyori.adventure.text.Component;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.World;
@@ -30,7 +31,9 @@ public class CreateMyIsland {
         // Controleer of de wereld al bestaat in Multiverse
         if (worldManager.isWorld(worldName)) {
             plugin.getLogger().info("Wereld van " + playerName + "bestaat al! ("+ worldName + ")");
-            player.sendMessage("§aJe hebt al een eiland aangemaakt!");
+
+            player.sendMessage(Component.translatable("already_exists"));
+
             return;
         } else {
             plugin.getLogger().info("Eiland creatie gestart voor " + playerName);

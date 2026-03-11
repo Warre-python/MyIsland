@@ -1,5 +1,11 @@
 package be.warrox.myIsland;
 
+import net.kyori.adventure.key.Key;
+import net.kyori.adventure.translation.GlobalTranslator;
+import net.kyori.adventure.translation.Translatable;
+import net.kyori.adventure.translation.TranslationRegistry;
+import net.kyori.adventure.translation.TranslationStore;
+import net.kyori.adventure.util.UTF8ResourceBundleControl;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
 import org.bukkit.World;
@@ -12,6 +18,10 @@ import org.mvplugins.multiverse.core.MultiverseCore;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
 import org.mvplugins.multiverse.core.world.WorldManager;
 
+import java.text.MessageFormat;
+import java.util.Locale;
+import java.util.ResourceBundle;
+
 
 public final class MyIsland extends JavaPlugin implements Listener {
     private static MultiverseCore mvCore;
@@ -23,6 +33,7 @@ public final class MyIsland extends JavaPlugin implements Listener {
     public void onEnable() {
         checkMultiverseCore();
         getServer().getPluginManager().registerEvents(this, this);
+        initTranslation();
         new IslandCommand(this).init();
         locationManager = new PlayerLocationManager();
     }
@@ -82,4 +93,23 @@ public final class MyIsland extends JavaPlugin implements Listener {
             }
         }
     }
+
+    private void initTranslation() {
+        // 1. Maak de store aan
+        TranslationStore.StringBased<MessageFormat> store = TranslationStore.messageFormat(Key.key("myisland", "translations"));
+
+        // 2. Registreer Engels (US) - Gebruik de constante
+        ResourceBundle bundleUs = ResourceBundle.getBundle("myIsland.Bundle", Locale.US, UTF8ResourceBundleControl.get());
+        store.registerAll(Locale.US, bundleUs, true);
+
+        // 3. Registreer Nederlands (België) - Gebruik Locale.of()
+        Locale nlBe = Locale.of("nl", "BE");
+        ResourceBundle bundleBe = ResourceBundle.getBundle("myIsland.Bundle", nlBe, UTF8ResourceBundleControl.get());
+        store.registerAll(nlBe, bundleBe, true);
+
+        // 4. Voeg de store toe aan de GlobalTranslator
+        GlobalTranslator.translator().addSource(store);
+    }
+
+
 }
