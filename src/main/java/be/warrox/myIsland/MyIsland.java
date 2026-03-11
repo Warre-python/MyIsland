@@ -112,6 +112,7 @@ public final class MyIsland extends JavaPlugin implements Listener {
         ResourceBundle bundleBe = ResourceBundle.getBundle("myIsland.Bundle", nlBe);
         store.registerAll(nlBe, bundleBe, true);
 
+
         // 3. Toevoegen aan GlobalTranslator
         GlobalTranslator.translator().addSource(store);
     }

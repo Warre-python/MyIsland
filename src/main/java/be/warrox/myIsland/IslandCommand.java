@@ -87,6 +87,16 @@ public class IslandCommand {
 
             root.then(tpisland);
 
+
+            // Subcommand: accept
+            LiteralArgumentBuilder<CommandSourceStack> accept = Commands.literal("accept")
+                    .executes(context -> {
+                        if (context.getSource().getExecutor() instanceof Player player) {
+                            plugin.send(player, "need_player_name");
+                        }
+                        return 1;
+                    });
+
             LiteralArgumentBuilder<CommandSourceStack> acceptCmd = Commands.literal("accept")
                     .then(Commands.argument("requester", StringArgumentType.word())
                             .executes(context -> {
