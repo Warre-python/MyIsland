@@ -7,10 +7,6 @@ import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.command.Command;
-import org.bukkit.command.CommandExecutor;
-import org.bukkit.command.CommandSender;
-import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.mvplugins.multiverse.core.world.MultiverseWorld;
 
@@ -24,7 +20,7 @@ public class IslandCommand {
     private final MyIsland plugin;
     private final CreateMyIsland islandCreator;
     // Slaat op: DoelSpelerUUID -> AanvragerUUID
-    private final Map<UUID, UUID> visitRequests = new HashMap<>();
+    private final Map<UUID, Map<String, Integer>> activeRequests = new HashMap<>();
 
     public IslandCommand(MyIsland plugin) {
         this.plugin = plugin;
@@ -40,7 +36,7 @@ public class IslandCommand {
             LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("myi")
                     .executes(context -> {
                         if (context.getSource().getExecutor() instanceof Player player) {
-                            player.sendMessage("§cGebruik: /myi <create | tpisland | tpmain | accept>");
+                            plugin.send(player, "myisland");
                         }
                         return 1;
                     });
@@ -60,10 +56,10 @@ public class IslandCommand {
                     Location previousLocation = plugin.getLocationManager().getPreviousLocation(player);
                     if (previousLocation != null) {
                         player.teleport(previousLocation);
-                        player.sendMessage("§aTerug naar de hoofdwereld!");
+                        plugin.send(player, "back_to_main");
                     } else {
                         player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
-                        player.sendMessage("§aTerug naar de hoofdwereld!");
+                        plugin.send(player, "back_to_main");
                     }
                 }
                 return 1;
@@ -91,13 +87,17 @@ public class IslandCommand {
 
             root.then(tpisland);
 
-            // Subcommand: accept
-            root.then(Commands.literal("accept").executes(context -> {
-                if (context.getSource().getExecutor() instanceof Player player) {
-                    handleAccept(player);
-                }
-                return 1;
-            }));
+            LiteralArgumentBuilder<CommandSourceStack> acceptCmd = Commands.literal("accept")
+                    .then(Commands.argument("requester", StringArgumentType.word())
+                            .executes(context -> {
+                                if (context.getSource().getExecutor() instanceof Player player) {
+                                    String requesterName = context.getArgument("requester", String.class);
+                                    handleAccept(player, requesterName);
+                                }
+                                return 1;
+                            }));
+
+            root.then(acceptCmd);
 
             // DAWERKELIJKE REGISTRATIE
             commands.register(root.build(), "Hoofdcommando voor MyIsland", List.of("island", "mi"));
@@ -113,34 +113,70 @@ public class IslandCommand {
 
         if (mvWorld != null) {
             player.teleport(mvWorld.getSpawnLocation());
-            player.sendMessage("§aGeteleporteerd naar " + targetName + "'s eiland!");
+            plugin.send(player, "teleported_to_island", targetName);
         } else {
-            player.sendMessage("§cDit eiland bestaat niet.");
+            plugin.send(player, "island_not_exist");
         }
     }
 
     private void handleVisitRequest(Player requester, String targetName) {
         Player target = Bukkit.getPlayer(targetName);
         if (target == null) {
-            requester.sendMessage("§cSpeler niet online.");
+            plugin.send(requester, "player_not_online");
             return;
         }
+
+        UUID targetUUID = target.getUniqueId();
+        String reqName = requester.getName();
+
+        // Verwijder vorig verzoek van deze speler indien aanwezig (om dubbele tasks te voorkomen)
+        cancelRequest(targetUUID, reqName);
+
+        // Sla het verzoek op
+        activeRequests.computeIfAbsent(targetUUID, k -> new HashMap<>());
+
+        // Start de 30 seconden timer (30 * 20 ticks)
+        int taskId = Bukkit.getScheduler().scheduleSyncDelayedTask(plugin, () -> {
+            cancelRequest(targetUUID, reqName);
+        }, 30 * 20L);
+
+        activeRequests.get(targetUUID).put(reqName, taskId);
+
         plugin.getLocationManager().saveLocation(requester);
-        visitRequests.put(target.getUniqueId(), requester.getUniqueId());
-        requester.sendMessage("§eVerzoek verzonden naar " + targetName);
-        target.sendMessage("§e" + requester.getName() + " wil je eiland bezoeken. Typ §a/myi accept §eom toe te staan.");
+        plugin.send(requester, "send_request", target.getName());
+
+        // Update je visit_request message in de .properties naar:
+        // visit_request=<green>{0} wants to visit. Type <yellow>/myi accept {0}</yellow> to allow (30s).
+        plugin.send(target, "visit_request", reqName);
     }
 
-    private void handleAccept(Player owner) {
-        UUID requesterUUID = visitRequests.remove(owner.getUniqueId());
-        if (requesterUUID == null) {
-            owner.sendMessage("§cGeen openstaande verzoeken.");
+    private void handleAccept(Player owner, String requesterName) {
+        Map<String, Integer> ownerRequests = activeRequests.get(owner.getUniqueId());
+
+        if (ownerRequests == null || !ownerRequests.containsKey(requesterName)) {
+            plugin.send(owner, "no_pending_requests"); // Of maak een "request_expired" key
             return;
         }
-        Player requester = Bukkit.getPlayer(requesterUUID);
+
+        // Stop de timer en verwijder uit map
+        cancelRequest(owner.getUniqueId(), requesterName);
+
+        Player requester = Bukkit.getPlayer(requesterName);
         if (requester != null) {
             teleportToIsland(requester, owner.getName());
-            owner.sendMessage("§aVerzoek geaccepteerd.");
+            plugin.send(owner, "request_accepted");
+        } else {
+            plugin.send(owner, "player_not_online");
         }
     }
+
+    private void cancelRequest(UUID ownerUUID, String reqName) {
+        Map<String, Integer> reqs = activeRequests.get(ownerUUID);
+        if (reqs != null && reqs.containsKey(reqName)) {
+            int taskId = reqs.remove(reqName);
+            Bukkit.getScheduler().cancelTask(taskId);
+            if (reqs.isEmpty()) activeRequests.remove(ownerUUID);
+        }
+    }
+
 }

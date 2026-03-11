@@ -1,24 +1,25 @@
 package be.warrox.myIsland;
 
 import net.kyori.adventure.key.Key;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.TextComponent;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import net.kyori.adventure.text.renderer.TranslatableComponentRenderer;
 import net.kyori.adventure.translation.GlobalTranslator;
-import net.kyori.adventure.translation.Translatable;
-import net.kyori.adventure.translation.TranslationRegistry;
 import net.kyori.adventure.translation.TranslationStore;
-import net.kyori.adventure.util.UTF8ResourceBundleControl;
 import org.bukkit.Bukkit;
 import org.bukkit.OfflinePlayer;
-import org.bukkit.World;
-import org.bukkit.WorldType;
+import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.plugin.java.JavaPlugin;
 import org.mvplugins.multiverse.core.MultiverseCore;
 import org.mvplugins.multiverse.core.MultiverseCoreApi;
-import org.mvplugins.multiverse.core.world.WorldManager;
 
 import java.text.MessageFormat;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.ResourceBundle;
 
@@ -94,22 +95,48 @@ public final class MyIsland extends JavaPlugin implements Listener {
         }
     }
 
+    // Maak dit een veld in je class zodat je het overal kunt gebruiken
+    private final TranslatableComponentRenderer<Locale> renderer =
+            TranslatableComponentRenderer.usingTranslationSource(GlobalTranslator.translator());
+
     private void initTranslation() {
-        // 1. Maak de store aan
+        // 1. Store aanmaken (Namespace "myisland" is prima)
         TranslationStore.StringBased<MessageFormat> store = TranslationStore.messageFormat(Key.key("myisland", "translations"));
 
-        // 2. Registreer Engels (US) - Gebruik de constante
-        ResourceBundle bundleUs = ResourceBundle.getBundle("myIsland.Bundle", Locale.US, UTF8ResourceBundleControl.get());
+        // Voor Engels
+        ResourceBundle bundleUs = ResourceBundle.getBundle("myIsland.Bundle", Locale.US);
         store.registerAll(Locale.US, bundleUs, true);
 
-        // 3. Registreer Nederlands (België) - Gebruik Locale.of()
+        // Voor Nederlands (België)
         Locale nlBe = Locale.of("nl", "BE");
-        ResourceBundle bundleBe = ResourceBundle.getBundle("myIsland.Bundle", nlBe, UTF8ResourceBundleControl.get());
+        ResourceBundle bundleBe = ResourceBundle.getBundle("myIsland.Bundle", nlBe);
         store.registerAll(nlBe, bundleBe, true);
 
-        // 4. Voeg de store toe aan de GlobalTranslator
+        // 3. Toevoegen aan GlobalTranslator
         GlobalTranslator.translator().addSource(store);
     }
+
+    public void send(Player player, String key, Object... args) {
+        // Maak de translatable component
+        List<TextComponent> componentArgs = Arrays.stream(args)
+                .map(obj -> Component.text(String.valueOf(obj)))
+                .toList();
+
+        // Gebruik de lijst in de translatable methode
+        Component translatable = Component.translatable(key, componentArgs);
+
+        // 1. De renderer haalt de ruwe tekst op uit je Bundle (bijv. "<green>Hello {0}!")
+        Component rendered = renderer.render(translatable, player.locale());
+
+        // 2. We moeten de resulterende tekst (die nog steeds de tags bevat) door MiniMessage halen
+        // Hiervoor halen we de 'content' uit de rendered component.
+        String rawText = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer.plainText().serialize(rendered);
+
+        // 3. Verstuur als echt gekleurde tekst
+        player.sendMessage(MiniMessage.miniMessage().deserialize(rawText));
+    }
+
+
 
 
 }
