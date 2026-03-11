@@ -58,7 +58,7 @@ public class IslandCommand {
                         player.teleport(previousLocation);
                         plugin.send(player, "back_to_main");
                     } else {
-                        player.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
+                        player.teleport(Bukkit.getWorlds().getFirst().getSpawnLocation());
                         plugin.send(player, "back_to_main");
                     }
                 }

