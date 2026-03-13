@@ -2,18 +2,20 @@ package be.warrox.myIsland;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.suggestion.SuggestionProvider;
 import io.papermc.paper.command.brigadier.CommandSourceStack;
 import io.papermc.paper.command.brigadier.Commands;
 import io.papermc.paper.plugin.lifecycle.event.types.LifecycleEvents;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.World;
 import org.bukkit.entity.Player;
+import org.bukkit.scheduler.BukkitRunnable;
 import org.mvplugins.multiverse.core.world.MultiverseWorld;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 
 public class IslandCommand {
 
@@ -22,17 +24,27 @@ public class IslandCommand {
     // Slaat op: DoelSpelerUUID -> AanvragerUUID
     private final Map<UUID, Map<String, Integer>> activeRequests = new HashMap<>();
 
+    private static final SuggestionProvider<CommandSourceStack> ONLINE_PLAYERS = (context, builder) -> {
+        String remaining = builder.getRemaining().toLowerCase();
+
+        Bukkit.getOnlinePlayers().stream()
+                .map(Player::getName)
+                .filter(name -> name.toLowerCase().startsWith(remaining))
+                .forEach(builder::suggest);
+
+        return builder.buildFuture();
+    };
+
+
     public IslandCommand(MyIsland plugin) {
         this.plugin = plugin;
         this.islandCreator = new CreateMyIsland(plugin);
     }
 
     public void init() {
-        // Registreer het commando via de Paper Lifecycle API
         plugin.getLifecycleManager().registerEventHandler(LifecycleEvents.COMMANDS, event -> {
             final Commands commands = event.registrar();
 
-            // Je hoofdcommando "myi"
             LiteralArgumentBuilder<CommandSourceStack> root = Commands.literal("myi")
                     .executes(context -> {
                         if (context.getSource().getExecutor() instanceof Player player) {
@@ -45,7 +57,6 @@ public class IslandCommand {
             root.then(Commands.literal("create").executes(context -> {
                 if (context.getSource().getExecutor() instanceof Player player) {
                     islandCreator.createIsland(player);
-
                 }
                 return 1;
             }));
@@ -56,60 +67,60 @@ public class IslandCommand {
                     Location previousLocation = plugin.getLocationManager().getPreviousLocation(player);
                     if (previousLocation != null) {
                         player.teleport(previousLocation);
-                        plugin.send(player, "back_to_main");
                     } else {
                         player.teleport(Bukkit.getWorlds().getFirst().getSpawnLocation());
-                        plugin.send(player, "back_to_main");
                     }
+                    plugin.send(player, "back_to_main");
                 }
                 return 1;
             }));
 
-            // Subcommand: tpisland
-            LiteralArgumentBuilder<CommandSourceStack> tpisland = Commands.literal("tpisland")
+            // Subcommand: tpisland <player>
+            root.then(Commands.literal("tpisland")
                     .executes(context -> {
                         if (context.getSource().getExecutor() instanceof Player player) {
                             plugin.getLocationManager().saveLocation(player);
                             teleportToIsland(player, player.getName());
                         }
                         return 1;
-                    });
+                    })
+                    .then(Commands.argument("player", StringArgumentType.word())
+                            .suggests(ONLINE_PLAYERS) // <--- Hier toegevoegd
+                            .executes(context -> {
+                                if (context.getSource().getExecutor() instanceof Player player) {
+                                    String targetName = context.getArgument("player", String.class);
+                                    handleVisitRequest(player, targetName);
+                                }
+                                return 1;
+                            })));
 
-            // Argument voor tpisland: /myi tpisland <player>
-            tpisland.then(Commands.argument("player", StringArgumentType.word())
-                    .executes(context -> {
-                        if (context.getSource().getExecutor() instanceof Player player) {
-                            String targetName = context.getArgument("player", String.class);
-                            handleVisitRequest(player, targetName);
-                        }
-                        return 1;
-                    }));
-
-            root.then(tpisland);
-
-
-            // Subcommand: accept
-            LiteralArgumentBuilder<CommandSourceStack> accept = Commands.literal("accept")
-                    .executes(context -> {
-                        if (context.getSource().getExecutor() instanceof Player player) {
-                            plugin.send(player, "need_player_name");
-                        }
-                        return 1;
-                    });
-
-            LiteralArgumentBuilder<CommandSourceStack> acceptCmd = Commands.literal("accept")
+            // Subcommand: accept <requester>
+            root.then(Commands.literal("accept")
                     .then(Commands.argument("requester", StringArgumentType.word())
+                            .suggests(ONLINE_PLAYERS) // <--- Hier toegevoegd
                             .executes(context -> {
                                 if (context.getSource().getExecutor() instanceof Player player) {
                                     String requesterName = context.getArgument("requester", String.class);
                                     handleAccept(player, requesterName);
                                 }
                                 return 1;
-                            }));
+                            })));
 
-            root.then(acceptCmd);
+            // Subcommand: kick <player>
+            root.then(Commands.literal("kick")
+                    .then(Commands.argument("player", StringArgumentType.word())
+                            .suggests(ONLINE_PLAYERS) // <--- Hier toegevoegd
+                            .executes(context -> {
+                                if (context.getSource().getExecutor() instanceof Player player) {
+                                    String kickPlayer = context.getArgument("player", String.class);
+                                    Player target = Bukkit.getPlayer(kickPlayer);
+                                    if (target != null) {
+                                        kickPlayer(player, target);
+                                    }
+                                }
+                                return 1;
+                            })));
 
-            // DAWERKELIJKE REGISTRATIE
             commands.register(root.build(), "Hoofdcommando voor MyIsland", List.of("island", "mi"));
         });
     }
@@ -118,16 +129,50 @@ public class IslandCommand {
 
     private void teleportToIsland(Player player, String targetName) {
         String worldName = "island_" + targetName;
+        var worldOptional = MyIsland.getApi().getWorldManager().getWorld(worldName);
 
-        MultiverseWorld mvWorld = MyIsland.getApi().getWorldManager().getWorld(worldName).get();
-
-        if (mvWorld != null) {
-            player.teleport(mvWorld.getSpawnLocation());
-            plugin.send(player, "teleported_to_island", targetName);
-        } else {
+        if (worldOptional.isEmpty()) {
             plugin.send(player, "island_not_exist");
+            return;
         }
+
+        Location startLocation = player.getLocation();
+        plugin.send(player, "teleport_starting_5s"); // "Blijf 5 seconden stilstaan..."
+
+        new BukkitRunnable() {
+            int secondsLeft = 5;
+
+            @Override
+            public void run() {
+                // Check of de speler nog online is
+                if (!player.isOnline()) {
+                    this.cancel();
+                    return;
+                }
+
+                // Check of de speler bewogen is (negeer kijken, check alleen x, y, z)
+                if (startLocation.distanceSquared(player.getLocation()) > 0.1) {
+                    plugin.send(player, "teleport_cancelled_moved");
+                    this.cancel();
+                    return;
+                }
+
+                secondsLeft--;
+
+                if (secondsLeft <= 0) {
+                    // Tijd is om, teleportatie uitvoeren
+                    MultiverseWorld mvWorld = worldOptional.get();
+                    player.teleport(mvWorld.getSpawnLocation());
+                    plugin.send(player, "teleported_to_island", targetName);
+                    this.cancel();
+                } else {
+                    // Optioneel: stuur elke seconde een melding (bijv. in de actionbar)
+                    player.sendActionBar(Component.text("Teleportatie over " + secondsLeft + " seconden...", NamedTextColor.YELLOW));
+                }
+            }
+        }.runTaskTimer(plugin, 20L, 20L); // Start na 1 sec (20 ticks), herhaal elke seconde
     }
+
 
     private void handleVisitRequest(Player requester, String targetName) {
         Player target = Bukkit.getPlayer(targetName);
@@ -189,4 +234,21 @@ public class IslandCommand {
         }
     }
 
+    public void kickPlayer(Player player, Player kickedPlayer) {
+        String worldName = "island_" + player.getName();
+
+        if (kickedPlayer.getWorld().getName().equals(worldName)) {
+
+            Location previousLocation = plugin.getLocationManager().getPreviousLocation(kickedPlayer);
+
+            if (previousLocation != null) {
+                kickedPlayer.teleport(previousLocation);
+            } else {
+                kickedPlayer.teleport(Bukkit.getWorlds().get(0).getSpawnLocation());
+            }
+
+            plugin.send(kickedPlayer, "got_kicked", player.getName());
+            plugin.send(player, "player_kicked", kickedPlayer.getName());
+        }
+    }
 }
