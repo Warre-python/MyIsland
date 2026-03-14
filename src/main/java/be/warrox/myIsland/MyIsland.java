@@ -137,7 +137,19 @@ public final class MyIsland extends JavaPlugin implements Listener {
         player.sendMessage(MiniMessage.miniMessage().deserialize(rawText));
     }
 
+    public void sendActionBar(Player player, String key, Object... args) {
+        List<TextComponent> componentArgs = Arrays.stream(args)
+                .map(obj -> Component.text(String.valueOf(obj)))
+                .toList();
 
+        Component translatable = Component.translatable(key, componentArgs);
 
+        Component rendered = renderer.render(translatable, player.locale());
 
+        String rawText = net.kyori.adventure.text.serializer.plain.PlainTextComponentSerializer
+                .plainText()
+                .serialize(rendered);
+
+        player.sendActionBar(MiniMessage.miniMessage().deserialize(rawText));
+    }
 }

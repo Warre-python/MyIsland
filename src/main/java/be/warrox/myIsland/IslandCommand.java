@@ -120,6 +120,15 @@ public class IslandCommand {
                                 }
                                 return 1;
                             })));
+            root.then(Commands.literal("help")
+                            .executes(context -> {
+                                if (context.getSource().getExecutor() instanceof Player player) {
+                                    plugin.send(player, "help");
+                                    return 1;
+                                }
+                                return 0;
+
+                            }));
 
             commands.register(root.build(), "Hoofdcommando voor MyIsland", List.of("island", "mi"));
         });
@@ -167,7 +176,7 @@ public class IslandCommand {
                     this.cancel();
                 } else {
                     // Optioneel: stuur elke seconde een melding (bijv. in de actionbar)
-                    player.sendActionBar(Component.text("Teleportatie over " + secondsLeft + " seconden...", NamedTextColor.YELLOW));
+                    plugin.sendActionBar(player, "seconds_left", secondsLeft);
                 }
             }
         }.runTaskTimer(plugin, 20L, 20L); // Start na 1 sec (20 ticks), herhaal elke seconde
